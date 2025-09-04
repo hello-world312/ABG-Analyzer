@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive ABG Interpretation Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        .card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+            padding: 2rem;
+            transition: all 0.3s ease-in-out;
+        }
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+            font-weight: 500;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            border: 1px solid #cbd5e0;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5);
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-primary {
+            background-color: #3182ce;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2b6cb0;
+        }
+        .btn-secondary {
+            background-color: #718096;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #4a5568;
+        }
+         .btn-outline {
+            background-color: transparent;
+            color: #3182ce;
+            border: 1px solid #3182ce;
+        }
+        .btn-outline:hover {
+            background-color: #ebf8ff;
+        }
+        #results-container {
+            border-left: 4px solid #3182ce;
+        }
+        .result-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+        }
+        .result-section {
+            margin-bottom: 1.5rem;
+        }
+        .result-section h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 0.5rem;
+        }
+        .teaching-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+        .teaching-step:last-child {
+            border-bottom: none;
+        }
+        .step-icon {
+            font-size: 1.25rem;
+            color: #3182ce;
+            margin-top: 0.25rem;
+        }
+        .highlight-acidosis { color: #c53030; font-weight: 600; }
+        .highlight-alkalosis { color: #2c5282; font-weight: 600; }
+        .highlight-compensated { color: #2f855a; font-weight: 600; }
+        .highlight-mixed { color: #b7791f; font-weight: 600; }
+        .highlight-invalid { background-color: #fed7d7; color: #c53030; padding: 0.25rem 0.5rem; border-radius: 6px; font-weight: 700;}
+        
+        .hidden { display: none; }
+
+        #modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        #modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        @media print {
+            body { background-color: white; }
+            .no-print { display: none; }
+            .container { margin: 0; padding: 0; }
+            .card { box-shadow: none; border: 1px solid #ccc; padding: 1rem; }
+            #input-card { display: block !important; }
+            #results-container { border-left: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1 class="text-4xl font-bold text-center text-gray-800 mb-8 no-print">Comprehensive ABG Interpretation Tool</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Input Panel -->
+            <div class="md:col-span-1 card no-print" id="input-card">
+                <h2 class="text-2xl font-bold text-gray-700 mb-6">Enter ABG Values</h2>
+                <div class="input-group">
+                    <label for="ph">pH</label>
+                    <input type="number" id="ph" step="0.01" placeholder="e.g., 7.35">
+                </div>
+                <div class="input-group">
+                    <label for="paco2">PaCO₂ (mmHg)</label>
+                    <input type="number" id="paco2" step="0.1" placeholder="e.g., 40">
+                </div>
+                <div class="input-group">
+                    <label for="hco3">HCO₃⁻ (mEq/L)</label>
+                    <input type="number" id="hco3" step="0.1" placeholder="e.g., 24">
+                </div>
+
+                <div class="mt-8 flex flex-col space-y-3">
+                    <button id="analyzeBtn" class="btn btn-primary justify-center"><i class="fas fa-calculator"></i>Analyze</button>
+                    <button id="resetBtn" class="btn btn-secondary justify-center"><i class="fas fa-undo"></i>Reset</button>
+                    <button id="formulasBtn" class="btn btn-outline justify-center"><i class="fas fa-flask"></i>Show Formulas</button>
+                </div>
+                <p class="text-xs text-gray-500 mt-6 text-center">For educational purposes only. Not a substitute for clinical judgment.</p>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="md:col-span-2">
+                <div class="card" id="results-container">
+                    <div id="results-content">
+                        <div class="text-center text-gray-500">
+                            <i class="fas fa-file-medical-alt text-6xl mb-4"></i>
+                            <p class="text-lg">Your detailed ABG interpretation will appear here.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulas Modal -->
+    <div id="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800">Formulas Used in Interpretation</h2>
+                <button id="closeModalBtn" class="text-2xl text-gray-600 hover:text-gray-900">&times;</button>
+            </div>
+            <div class="space-y-4 text-gray-700">
+                <div>
+                    <h3 class="font-bold text-lg text-blue-700">Metabolic Acidosis Compensation (Winter's Formula)</h3>
+                    <p>Expected PaCO₂ = (1.5 &times; HCO₃⁻) + (8 &plusmn; 2)</p>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg text-blue-700">Metabolic Alkalosis Compensation</h3>
+                    <p>Expected PaCO₂ = (0.7 &times; HCO₃⁻) + (21 &plusmn; 2)</p>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg text-red-700">Respiratory Acidosis Compensation (HCO₃⁻-based)</h3>
+                    <p><b>Acute:</b> Expected HCO₃⁻ = 24 + [0.1 &times; (PaCO₂ - 40)]</p>
+                    <p><b>Chronic:</b> Expected HCO₃⁻ = 24 + [0.4 &times; (PaCO₂ - 40)]</p>
+                </div>
+                 <div>
+                    <h3 class="font-bold text-lg text-red-700">Respiratory Alkalosis Compensation (HCO₃⁻-based)</h3>
+                    <p><b>Acute:</b> Expected HCO₃⁻ = 24 - [0.2 &times; (40 - PaCO₂)]</p>
+                    <p><b>Chronic:</b> Expected HCO₃⁻ = 24 - [0.5 &times; (40 - PaCO₂)]</p>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg text-gray-700">ABG Validity Check (Henderson-Hasselbalch)</h3>
+                    <p>Calculated pH = 6.1 + log₁₀( [HCO₃⁻] / (0.03 &times; PaCO₂) )</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const phInput = document.getElementById('ph');
+            const paco2Input = document.getElementById('paco2');
+            const hco3Input = document.getElementById('hco3');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const formulasBtn = document.getElementById('formulasBtn');
+            const modal = document.getElementById('modal');
+            const closeModalBtn = document.getElementById('closeModalBtn');
+            const resultsContent = document.getElementById('results-content');
+            
+            // Event Listeners
+            analyzeBtn.addEventListener('click', interpretABG);
+            resetBtn.addEventListener('click', resetForm);
+            formulasBtn.addEventListener('click', () => modal.classList.add('show'));
+            closeModalBtn.addEventListener('click', () => modal.classList.remove('show'));
+            modal.addEventListener('click', (e) => {
+                if (e.target.id === 'modal') {
+                    modal.classList.remove('show');
+                }
+            });
+
+            // --- Core Logic ---
+            function interpretABG() {
+                const ph = parseFloat(phInput.value);
+                const paco2 = parseFloat(paco2Input.value);
+                const hco3 = parseFloat(hco3Input.value);
+
+                if (isNaN(ph) || isNaN(paco2) || isNaN(hco3)) {
+                    alert('Please enter valid numbers for all fields.');
+                    return;
+                }
+
+                // Initialize variables
+                let primaryDisorder = '';
+                let compensationStatus = '';
+                let mixedDisorder = '';
+                let teachingSteps = [];
+                let isValid = true;
+
+                // --- Step 0: Validity Check ---
+                const calculatedpH = 6.1 + Math.log10(hco3 / (0.03 * paco2));
+                if (Math.abs(calculatedpH - ph) > 0.03) {
+                    isValid = false;
+                }
+                teachingSteps.push({
+                    icon: isValid ? 'fa-check-circle' : 'fa-exclamation-triangle',
+                    text: `<b>Step 0: ABG Validity Check.</b> The reported pH is ${ph.toFixed(2)}. Based on the Henderson-Hasselbalch equation, the calculated pH is ${calculatedpH.toFixed(2)}. ${isValid ? 'The sample is internally consistent.' : '<span class="highlight-invalid">The sample may be invalid due to a significant discrepancy.</span>'}`
+                });
+
+                // --- Step 1: Identify Primary Disorder ---
+                const phIsNormal = ph >= 7.35 && ph <= 7.45;
+                const phIsAcidosis = ph < 7.35;
+                const phIsAlkalosis = ph > 7.45;
+                
+                const paco2IsHigh = paco2 > 45;
+                const paco2IsLow = paco2 < 35;
+                
+                const hco3IsHigh = hco3 > 26;
+                const hco3IsLow = hco3 < 22;
+
+                let primaryStepText = `<b>Step 1: Primary Disorder.</b> The pH of ${ph.toFixed(2)} is `;
+                
+                if (phIsAcidosis) {
+                    primaryStepText += `<span class="highlight-acidosis">low</span>, indicating <b>Acidosis</b>. `;
+                    if (paco2IsHigh) {
+                        primaryDisorder = 'Respiratory Acidosis';
+                        primaryStepText += `The PaCO₂ of ${paco2} mmHg is high, matching the acidosis. The primary disorder is <span class="highlight-acidosis">${primaryDisorder}</span>.`;
+                    } else if (hco3IsLow) {
+                        primaryDisorder = 'Metabolic Acidosis';
+                         primaryStepText += `The HCO₃⁻ of ${hco3} mEq/L is low, matching the acidosis. The primary disorder is <span class="highlight-acidosis">${primaryDisorder}</span>.`;
+                    } else {
+                         primaryDisorder = 'Mixed Acidosis';
+                         primaryStepText += 'Both PaCO₂ is high and HCO₃⁻ is low. This indicates a <span class="highlight-mixed">Mixed Acidosis</span>.';
+                         mixedDisorder = 'Mixed Acidosis';
+                    }
+                } else if (phIsAlkalosis) {
+                    primaryStepText += `<span class="highlight-alkalosis">high</span>, indicating <b>Alkalosis</b>. `;
+                    if (paco2IsLow) {
+                        primaryDisorder = 'Respiratory Alkalosis';
+                         primaryStepText += `The PaCO₂ of ${paco2} mmHg is low, matching the alkalosis. The primary disorder is <span class="highlight-alkalosis">${primaryDisorder}</span>.`;
+                    } else if (hco3IsHigh) {
+                        primaryDisorder = 'Metabolic Alkalosis';
+                         primaryStepText += `The HCO₃⁻ of ${hco3} mEq/L is high, matching the alkalosis. The primary disorder is <span class="highlight-alkalosis">${primaryDisorder}</span>.`;
+                    } else {
+                        primaryDisorder = 'Mixed Alkalosis';
+                        primaryStepText += 'Both PaCO₂ is low and HCO₃⁻ is high. This indicates a <span class="highlight-mixed">Mixed Alkalosis</span>.';
+                        mixedDisorder = 'Mixed Alkalosis';
+                    }
+                } else { // Normal pH
+                     primaryStepText += `<b>normal</b>. `;
+                     if(paco2IsHigh && hco3IsHigh) {
+                         primaryDisorder = "Compensated Respiratory Acidosis or Metabolic Alkalosis";
+                         primaryStepText += `The PaCO₂ and HCO₃⁻ are both high, suggesting a fully compensated disorder. Further analysis will clarify.`;
+                     } else if (paco2IsLow && hco3IsLow) {
+                         primaryDisorder = "Compensated Respiratory Alkalosis or Metabolic Acidosis";
+                         primaryStepText += `The PaCO₂ and HCO₃⁻ are both low, suggesting a fully compensated disorder. Further analysis will clarify.`;
+                     } else if (!paco2IsHigh && !paco2IsLow && !hco3IsHigh && !hco3IsLow) {
+                         primaryDisorder = "Normal ABG";
+                         primaryStepText += 'PaCO₂ and HCO₃⁻ are also normal. This is a <span class="highlight-compensated">Normal ABG</span>.';
+                     } else {
+                         primaryDisorder = "Likely Mixed Disorder";
+                         primaryStepText += `The PaCO₂ or HCO₃⁻ is abnormal, indicating a likely mixed disorder with compensation.`;
+                     }
+                }
+                teachingSteps.push({ icon: 'fa-search', text: primaryStepText });
+
+                // --- Step 2 & 3: Assess Compensation and Mixed Disorders ---
+                if (primaryDisorder.includes('Metabolic Acidosis')) {
+                    const expectedPaco2Lower = (1.5 * hco3) + 8 - 2;
+                    const expectedPaco2Upper = (1.5 * hco3) + 8 + 2;
+                    let compStepText = `<b>Step 2: Compensation Check.</b> For Metabolic Acidosis, the expected PaCO₂ (Winter's Formula) is between ${expectedPaco2Lower.toFixed(1)} and ${expectedPaco2Upper.toFixed(1)} mmHg. `;
+                    
+                    if (paco2 >= expectedPaco2Lower && paco2 <= expectedPaco2Upper) {
+                        compensationStatus = 'Appropriate';
+                        compStepText += `The measured PaCO₂ of ${paco2} is within this range, indicating <span class="highlight-compensated">appropriate respiratory compensation</span>.`;
+                    } else if (paco2 < expectedPaco2Lower) {
+                        mixedDisorder = 'Concurrent Respiratory Alkalosis';
+                        compStepText += `The measured PaCO₂ of ${paco2} is lower than expected, indicating excessive compensation. This is a <span class="highlight-mixed">Mixed Disorder with a concurrent Respiratory Alkalosis</span>.`;
+                    } else { // paco2 > expectedPaco2Upper
+                        mixedDisorder = 'Concurrent Respiratory Acidosis';
+                        compStepText += `The measured PaCO₂ of ${paco2} is higher than expected, indicating inadequate compensation. This is a <span class="highlight-mixed">Mixed Disorder with a concurrent Respiratory Acidosis</span>.`;
+                    }
+                     teachingSteps.push({ icon: 'fa-balance-scale', text: compStepText });
+                }
+                
+                if (primaryDisorder.includes('Metabolic Alkalosis')) {
+                    const expectedPaco2Lower = (0.7 * hco3) + 21 - 2;
+                    const expectedPaco2Upper = (0.7 * hco3) + 21 + 2;
+                    let compStepText = `<b>Step 2: Compensation Check.</b> For Metabolic Alkalosis, the expected PaCO₂ is between ${expectedPaco2Lower.toFixed(1)} and ${expectedPaco2Upper.toFixed(1)} mmHg. `;
+                    
+                    if (paco2 >= expectedPaco2Lower && paco2 <= expectedPaco2Upper) {
+                        compensationStatus = 'Appropriate';
+                        compStepText += `The measured PaCO₂ of ${paco2} is within this range, indicating <span class="highlight-compensated">appropriate respiratory compensation</span>.`;
+                    } else if (paco2 > expectedPaco2Upper) {
+                        mixedDisorder = 'Concurrent Respiratory Acidosis';
+                        compStepText += `The measured PaCO₂ of ${paco2} is higher than expected, indicating excessive compensation. This is a <span class="highlight-mixed">Mixed Disorder with a concurrent Respiratory Acidosis</span>.`;
+                    } else { // paco2 < expectedPaco2Lower
+                        mixedDisorder = 'Concurrent Respiratory Alkalosis';
+                         compStepText += `The measured PaCO₂ of ${paco2} is lower than expected, indicating inadequate compensation. This is a <span class="highlight-mixed">Mixed Disorder with a concurrent Respiratory Alkalosis</span>.`;
+                    }
+                    teachingSteps.push({ icon: 'fa-balance-scale', text: compStepText });
+                }
+
+                if (primaryDisorder.includes('Respiratory Acidosis')) {
+                    const expectedHco3Acute = 24 + (0.1 * (paco2 - 40));
+                    const expectedHco3Chronic = 24 + (0.4 * (paco2 - 40));
+                    let compStepText = `<b>Step 2: Assess Acuity & Compensation.</b> For Respiratory Acidosis:<ul>
+                        <li>Expected acute HCO₃⁻ is ~${expectedHco3Acute.toFixed(1)} mEq/L.</li>
+                        <li>Expected chronic HCO₃⁻ is ~${expectedHco3Chronic.toFixed(1)} mEq/L.</li>
+                    </ul>`;
+                    
+                    const diffAcute = Math.abs(hco3 - expectedHco3Acute);
+                    const diffChronic = Math.abs(hco3 - expectedHco3Chronic);
+                    
+                    if(diffAcute < diffChronic) {
+                        primaryDisorder = 'Acute Respiratory Acidosis';
+                    } else {
+                         primaryDisorder = 'Chronic Respiratory Acidosis';
+                    }
+                    
+                    if (hco3 > expectedHco3Chronic + 2) {
+                         mixedDisorder = 'Concurrent Metabolic Alkalosis';
+                         compStepText += `The measured HCO₃⁻ of ${hco3} is higher than expected even for chronic compensation. This is a <span class="highlight-mixed">Mixed Disorder with a concurrent Metabolic Alkalosis</span>.`;
+                    } else if (hco3 < expectedHco3Acute - 2) {
+                        mixedDisorder = 'Concurrent Metabolic Acidosis';
+                        compStepText += `The measured HCO₃⁻ of ${hco3} is lower than expected even for an acute process. This is a <span class="highlight-mixed">Mixed Disorder with a concurrent Metabolic Acidosis</span>.`;
+                    } else {
+                         compensationStatus = 'Appropriate';
+                         compStepText += `The measured HCO₃⁻ of ${hco3} suggests the disorder is <b>${primaryDisorder}</b> with <span class="highlight-compensated">appropriate metabolic compensation</span>.`;
+                    }
+                     teachingSteps.push({ icon: 'fa-balance-scale', text: compStepText });
+                }
+                
+                if (primaryDisorder.includes('Respiratory Alkalosis')) {
+                     const expectedHco3Acute = 24 - (0.2 * (40 - paco2));
+                     const expectedHco3Chronic = 24 - (0.5 * (40 - paco2));
+                     let compStepText = `<b>Step 2: Assess Acuity & Compensation.</b> For Respiratory Alkalosis:<ul>
+                        <li>Expected acute HCO₃⁻ is ~${expectedHco3Acute.toFixed(1)} mEq/L.</li>
+                        <li>Expected chronic HCO₃⁻ is ~${expectedHco3Chronic.toFixed(1)} mEq/L.</li>
+                    </ul>`;
+                    
+                    const diffAcute = Math.abs(hco3 - expectedHco3Acute);
+                    const diffChronic = Math.abs(hco3 - expectedHco3Chronic);
+                    
+                    if(diffAcute < diffChronic) {
+                        primaryDisorder = 'Acute Respiratory Alkalosis';
+                    } else {
+                         primaryDisorder = 'Chronic Respiratory Alkalosis';
+                    }
+                    
+                    if (hco3 < expectedHco3Chronic - 2) {
+                        mixedDisorder = 'Concurrent Metabolic Acidosis';
+                        compStepText += `The measured HCO₃⁻ of ${hco3} is lower than expected even for chronic compensation. This is a <span class="highlight-mixed">Mixed Disorder with a concurrent Metabolic Acidosis</span>.`;
+                    } else if (hco3 > expectedHco3Acute + 2) {
+                        mixedDisorder = 'Concurrent Metabolic Alkalosis';
+                        compStepText += `The measured HCO₃⁻ of ${hco3} is higher than expected even for an acute process. This is a <span class="highlight-mixed">Mixed Disorder with a concurrent Metabolic Alkalosis</span>.`;
+                    } else {
+                        compensationStatus = 'Appropriate';
+                        compStepText += `The measured HCO₃⁻ of ${hco3} suggests the disorder is <b>${primaryDisorder}</b> with <span class="highlight-compensated">appropriate metabolic compensation</span>.`;
+                    }
+                     teachingSteps.push({ icon: 'fa-balance-scale', text: compStepText });
+                }
+
+                // Step 4: Partial vs. Complete Compensation
+                if (compensationStatus === 'Appropriate' && primaryDisorder !== "Normal ABG") {
+                    let finalStepText = `<b>Step 3: Degree of Compensation.</b> `;
+                    if (phIsNormal) {
+                        compensationStatus = 'Complete';
+                        finalStepText += `The pH has returned to the normal range. This is <span class="highlight-compensated">Complete Compensation</span>.`;
+                    } else {
+                        compensationStatus = 'Partial';
+                        finalStepText += `The pH remains outside the normal range. This is <span class="highlight-compensated">Partial Compensation</span>.`;
+                    }
+                    teachingSteps.push({ icon: 'fa-tasks', text: finalStepText });
+                }
+
+                // Render the results
+                renderResults(ph, paco2, hco3, primaryDisorder, compensationStatus, mixedDisorder, teachingSteps, isValid);
+            }
+
+            function renderResults(ph, paco2, hco3, primary, compensation, mixed, steps, valid) {
+                // Create the analysis result text
+                let analysisResult = primary;
+                
+                if (mixed) {
+                    // Include both primary and concurrent disorders
+                    analysisResult = `${primary} with ${mixed}`;
+                } else if (compensation === 'Appropriate') {
+                    analysisResult = `${primary} with appropriate compensation`;
+                } else if (compensation === 'Partial') {
+                    analysisResult = `${primary} with partial compensation`;
+                } else if (compensation === 'Complete') {
+                    analysisResult = `${primary} with complete compensation`;
+                }
+
+                let html = `
+                    <div class="result-title">ABG Interpretation Report</div>
+                    
+                    <div class="mb-6 bg-gray-50 p-4 rounded-lg border">
+                        <h3 class="font-bold text-gray-700 mb-2">Input Values:</h3>
+                        <div class="grid grid-cols-3 gap-4 text-center">
+                            <div><span class="font-semibold">pH:</span> ${ph.toFixed(2)}</div>
+                            <div><span class="font-semibold">PaCO₂:</span> ${paco2} mmHg</div>
+                            <div><span class="font-semibold">HCO₃⁻:</span> ${hco3} mEq/L</div>
+                        </div>
+                    </div>
+
+                    ${!valid ? `<div class="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50" role="alert">
+                      <span class="font-bold">Validity Warning:</span> The entered ABG values are not internally consistent based on the Henderson-Hasselbalch equation. Please verify the sample and data.
+                    </div>` : ''}
+
+                    <div class="result-section">
+                        <h3>The Analysis Result:</h3>
+                        <p class="text-xl font-bold ${mixed ? 'highlight-mixed' : (primary.includes('Acidosis') ? 'highlight-acidosis' : 'highlight-alkalosis')}">
+                            ${analysisResult}
+                        </p>
+                    </div>
+
+                    <div class="mt-4">
+                        <button id="toggleReasoningBtn" class="btn btn-outline w-full justify-center"><i class="fas fa-microscope"></i> Show Step-by-Step Reasoning</button>
+                    </div>
+
+                    <div id="reasoning-section" class="result-section hidden mt-6">
+                        <h3>Step-by-Step Reasoning:</h3>
+                        <div class="space-y-2">
+                `;
+                steps.forEach(step => {
+                    html += `
+                        <div class="teaching-step">
+                            <i class="fas ${step.icon} step-icon"></i>
+                            <div class="text-gray-800">${step.text}</div>
+                        </div>
+                    `;
+                });
+                html += `</div></div>`;
+                resultsContent.innerHTML = html;
+
+                // Add event listener for the new toggle button
+                const toggleBtn = document.getElementById('toggleReasoningBtn');
+                const reasoningSection = document.getElementById('reasoning-section');
+
+                if (toggleBtn && reasoningSection) {
+                    toggleBtn.addEventListener('click', () => {
+                        const isHidden = reasoningSection.classList.contains('hidden');
+                        if (isHidden) {
+                            reasoningSection.classList.remove('hidden');
+                            toggleBtn.innerHTML = `<i class="fas fa-eye-slash"></i> Hide Step-by-Step Reasoning`;
+                        } else {
+                            reasoningSection.classList.add('hidden');
+                            toggleBtn.innerHTML = `<i class="fas fa-microscope"></i> Show Step-by-Step Reasoning`;
+                        }
+                    });
+                }
+            }
+
+            function resetForm() {
+                phInput.value = '';
+                paco2Input.value = '';
+                hco3Input.value = '';
+                resultsContent.innerHTML = `
+                    <div class="text-center text-gray-500">
+                        <i class="fas fa-file-medical-alt text-6xl mb-4"></i>
+                        <p class="text-lg">Your detailed ABG interpretation will appear here.</p>
+                    </div>`;
+            }
+
+        });
+    </script>
+
+</body>
+</html>
