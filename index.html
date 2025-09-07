@@ -69,7 +69,7 @@
         .btn-secondary:hover {
             background-color: #4a5568;
         }
-         .btn-outline {
+        .btn-outline {
             background-color: transparent;
             color: #3182ce;
             border: 1px solid #3182ce;
@@ -117,6 +117,7 @@
         .highlight-compensated { color: #2f855a; font-weight: 600; }
         .highlight-mixed { color: #b7791f; font-weight: 600; }
         .highlight-invalid { background-color: #fed7d7; color: #c53030; padding: 0.25rem 0.5rem; border-radius: 6px; font-weight: 700;}
+        .highlight-note { background-color: #e6fffa; color: #234e52; padding: 0.75rem; border-radius: 8px; border-left: 4px solid #38b2ac; margin: 1rem 0; }
         
         .hidden { display: none; }
 
@@ -277,6 +278,7 @@
                 let mixedDisorder = '';
                 let teachingSteps = [];
                 let isValid = true;
+                let note = '';
 
                 // --- Step 0: Validity Check ---
                 const calculatedpH = 6.1 + Math.log10(hco3 / (0.03 * paco2));
@@ -329,12 +331,15 @@
                     }
                 } else { // Normal pH
                      primaryStepText += `<b>normal</b>. `;
-                     if(paco2IsHigh && hco3IsHigh) {
-                         primaryDisorder = "Compensated Respiratory Acidosis or Metabolic Alkalosis";
-                         primaryStepText += `The PaCO₂ and HCO₃⁻ are both high, suggesting a fully compensated disorder. Further analysis will clarify.`;
-                     } else if (paco2IsLow && hco3IsLow) {
-                         primaryDisorder = "Compensated Respiratory Alkalosis or Metabolic Acidosis";
-                         primaryStepText += `The PaCO₂ and HCO₃⁻ are both low, suggesting a fully compensated disorder. Further analysis will clarify.`;
+                     
+                     // Check if both PaCO₂ and HCO₃⁻ are abnormal
+                     if((paco2IsHigh && hco3IsHigh) || (paco2IsLow && hco3IsLow)) {
+                         // Use the new algorithm to determine the primary disorder
+                         const result = determinePrimaryFromNormalPH(ph, paco2, hco3);
+                         primaryDisorder = result.primaryDisorder;
+                         compensationStatus = result.compensationStatus;
+                         
+                         primaryStepText += `The PaCO₂ and HCO₃⁻ are both ${paco2IsHigh ? 'high' : 'low'}, suggesting a fully compensated disorder. Based on compensation formulas, the primary disorder is <b>${primaryDisorder}</b>.`;
                      } else if (!paco2IsHigh && !paco2IsLow && !hco3IsHigh && !hco3IsLow) {
                          primaryDisorder = "Normal ABG";
                          primaryStepText += 'PaCO₂ and HCO₃⁻ are also normal. This is a <span class="highlight-compensated">Normal ABG</span>.';
@@ -392,6 +397,11 @@
                     
                     const diffAcute = Math.abs(hco3 - expectedHco3Acute);
                     const diffChronic = Math.abs(hco3 - expectedHco3Chronic);
+                    
+                    // Check if HCO₃⁻ is between acute and chronic expected values
+                    if (hco3 > expectedHco3Acute && hco3 < expectedHco3Chronic) {
+                        note = `<div class="highlight-note"><b>Note:</b> The measured HCO₃⁻ of ${hco3} mEq/L is between the acute (${expectedHco3Acute.toFixed(1)} mEq/L) and chronic (${expectedHco3Chronic.toFixed(1)} mEq/L) expected values. This may suggest <b>acute-on-chronic respiratory acidosis</b>.</div>`;
+                    }
                     
                     if(diffAcute < diffChronic) {
                         primaryDisorder = 'Acute Respiratory Acidosis';
@@ -456,10 +466,84 @@
                 }
 
                 // Render the results
-                renderResults(ph, paco2, hco3, primaryDisorder, compensationStatus, mixedDisorder, teachingSteps, isValid);
+                renderResults(ph, paco2, hco3, primaryDisorder, compensationStatus, mixedDisorder, teachingSteps, isValid, note);
             }
 
-            function renderResults(ph, paco2, hco3, primary, compensation, mixed, steps, valid) {
+            function determinePrimaryFromNormalPH(ph, paco2, hco3) {
+                let primaryDisorder = '';
+                let compensationStatus = 'Complete';
+                
+                // pH tilt analysis
+                const acidTilt = ph >= 7.35 && ph <= 7.39;
+                const alkaliTilt = ph >= 7.41 && ph <= 7.45;
+                const neutral = ph === 7.40;
+                
+                if (paco2 > 45 && hco3 > 26) { // Both high
+                    // Step 1: Check pH tilt
+                    if (acidTilt) {
+                        primaryDisorder = 'Respiratory Acidosis';
+                    } else if (alkaliTilt) {
+                        primaryDisorder = 'Metabolic Alkalosis';
+                    } else if (neutral) {
+                        // Step 2: Use expected compensation formulas
+                        // Check for metabolic alkalosis
+                        const expectedPaco2MetAlkLower = (0.7 * hco3) + 21 - 2;
+                        const expectedPaco2MetAlkUpper = (0.7 * hco3) + 21 + 2;
+                        
+                        // Check for respiratory acidosis (chronic)
+                        const expectedHco3RespAcidChronic = 24 + (0.4 * (paco2 - 40));
+                        const chronicDiff = Math.abs(hco3 - expectedHco3RespAcidChronic);
+                        
+                        if (paco2 >= expectedPaco2MetAlkLower && paco2 <= expectedPaco2MetAlkUpper) {
+                            primaryDisorder = 'Metabolic Alkalosis';
+                        } else if (Math.abs(hco3 - expectedHco3RespAcidChronic) <= 2) {
+                            primaryDisorder = 'Respiratory Acidosis';
+                        } else {
+                            // If neither fits perfectly, choose based on which is closer
+                            const metAlkDiff = Math.min(
+                                Math.abs(paco2 - expectedPaco2MetAlkLower),
+                                Math.abs(paco2 - expectedPaco2MetAlkUpper)
+                            );
+                            
+                            primaryDisorder = metAlkDiff < chronicDiff ? 'Metabolic Alkalosis' : 'Respiratory Acidosis';
+                        }
+                    }
+                } else if (paco2 < 35 && hco3 < 22) { // Both low
+                    // Step 1: Check pH tilt
+                    if (acidTilt) {
+                        primaryDisorder = 'Metabolic Acidosis';
+                    } else if (alkaliTilt) {
+                        primaryDisorder = 'Respiratory Alkalosis';
+                    } else if (neutral) {
+                        // Step 2: Use expected compensation formulas
+                        // Check for metabolic acidosis
+                        const expectedPaco2MetAcidLower = (1.5 * hco3) + 8 - 2;
+                        const expectedPaco2MetAcidUpper = (1.5 * hco3) + 8 + 2;
+                        
+                        // Check for respiratory alkalosis (chronic)
+                        const expectedHco3RespAlkChronic = 24 - (0.5 * (40 - paco2));
+                        const chronicDiff = Math.abs(hco3 - expectedHco3RespAlkChronic);
+                        
+                        if (paco2 >= expectedPaco2MetAcidLower && paco2 <= expectedPaco2MetAcidUpper) {
+                            primaryDisorder = 'Metabolic Acidosis';
+                        } else if (Math.abs(hco3 - expectedHco3RespAlkChronic) <= 2) {
+                            primaryDisorder = 'Respiratory Alkalosis';
+                        } else {
+                            // If neither fits perfectly, choose based on which is closer
+                            const metAcidDiff = Math.min(
+                                Math.abs(paco2 - expectedPaco2MetAcidLower),
+                                Math.abs(paco2 - expectedPaco2MetAcidUpper)
+                            );
+                            
+                            primaryDisorder = metAcidDiff < chronicDiff ? 'Metabolic Acidosis' : 'Respiratory Alkalosis';
+                        }
+                    }
+                }
+                
+                return { primaryDisorder, compensationStatus };
+            }
+
+            function renderResults(ph, paco2, hco3, primary, compensation, mixed, steps, valid, note) {
                 // Create the analysis result text
                 let analysisResult = primary;
                 
@@ -496,6 +580,8 @@
                             ${analysisResult}
                         </p>
                     </div>
+
+                    ${note || ''}
 
                     <div class="mt-4">
                         <button id="toggleReasoningBtn" class="btn btn-outline w-full justify-center"><i class="fas fa-microscope"></i> Show Step-by-Step Reasoning</button>
